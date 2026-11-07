@@ -84,7 +84,7 @@ fn run() -> eyre::Result<()> {
         .map(BufReader::new)
     {
         if let Err(e) = conn.read_line(&mut buffer) {
-            eprintln!("{}", e);
+            eprintln!("failed to read client buffer: {}", e);
             continue;
         }
 
@@ -103,7 +103,7 @@ fn run() -> eyre::Result<()> {
 
 fn reply(conn: &mut BufReader<Stream>, buf: &[u8]) {
     if let Err(e) = conn.get_mut().write_all(buf) {
-        eprintln!("failed to respond to client: {}", e);
+        eprintln!("failed to reply to client: {}", e);
     }
 }
 
