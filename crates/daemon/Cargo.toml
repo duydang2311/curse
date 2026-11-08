@@ -10,3 +10,6 @@ eyre = { workspace = true }
 interprocess = { workspace = true }
 postcard = { workspace = true, features = ["alloc"] }
 serde = { workspace = true }
+
+[build-dependencies]
+bindgen = "0.73.2"
