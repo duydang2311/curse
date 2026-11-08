@@ -1,9 +1,7 @@
 use clap::Command;
+use common::get_socket_name;
 use eyre::{Context, bail, eyre};
-use interprocess::local_socket::{
-    GenericFilePath, GenericNamespaced, ListenerOptions, Name, NameType, Stream, ToFsName,
-    ToNsName, prelude::*,
-};
+use interprocess::local_socket::{ListenerOptions, Stream, prelude::*};
 use std::io::{BufRead, BufReader, Write};
 
 const SOCKET_NAME: &str = "curse-daemon.sock";
@@ -11,7 +9,7 @@ const SOCKET_NAME: &str = "curse-daemon.sock";
 fn cli() -> Command {
     Command::new("curse-daemon")
         .about("curse music player daemon")
-        .version("v0.0.1")
+        .version("v0.1.0")
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommand(Command::new("start").about("Start the daemon (detached)"))
@@ -104,18 +102,5 @@ fn run() -> eyre::Result<()> {
 fn reply(conn: &mut BufReader<Stream>, buf: &[u8]) {
     if let Err(e) = conn.get_mut().write_all(buf) {
         eprintln!("failed to reply to client: {}", e);
-    }
-}
-
-fn get_socket_name() -> eyre::Result<Name<'static>> {
-    if GenericNamespaced::is_supported() {
-        Ok(SOCKET_NAME.to_ns_name::<GenericNamespaced>()?)
-    } else {
-        let mut temp_dir = std::env::temp_dir();
-        temp_dir.set_file_name(SOCKET_NAME);
-        Ok(temp_dir
-            .into_string()
-            .expect("failed to create curse-daemon.sock file in temp dir")
-            .to_fs_name::<GenericFilePath>()?)
     }
 }
