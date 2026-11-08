@@ -6,3 +6,5 @@ edition = "2024"
 [dependencies]
 eyre = { workspace = true }
 interprocess = { workspace = true }
+postcard = { workspace = true }
+serde = { workspace = true }

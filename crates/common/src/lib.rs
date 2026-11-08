@@ -2,6 +2,8 @@ use interprocess::local_socket::{
     GenericFilePath, GenericNamespaced, Name, NameType, ToNsName, prelude::*,
 };
 
+pub mod msg;
+
 const SOCKET_NAME: &str = "curse-daemon.sock";
 
 pub fn get_socket_name() -> eyre::Result<Name<'static>> {

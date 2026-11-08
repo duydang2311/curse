@@ -12,6 +12,8 @@ crossterm = "0.29.0"
 ratatui = "0.30.2"
 eyre = { workspace = true }
 interprocess = { workspace = true }
+postcard = { workspace = true, features = ["alloc"] }
+serde = { workspace = true }
 
 [profile.release]
 codegen-units = 1

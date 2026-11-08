@@ -1,7 +1,8 @@
-use crate::{app::App, file_tree::FileTree};
+use crate::{app::App, daemon::DaemonClient, file_tree::FileTree};
 use std::env;
 
 mod app;
+mod daemon;
 mod file_tree;
 
 fn main() -> eyre::Result<()> {
@@ -12,6 +13,7 @@ fn main() -> eyre::Result<()> {
                 Ok(path) => path,
                 Err(e) => env::home_dir().ok_or(e)?,
             })?,
+            daemon_client: DaemonClient::new(),
         }
         .run(term)
     })

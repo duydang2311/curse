@@ -1,4 +1,6 @@
-use crate::file_tree::FileTree;
+use std::path::PathBuf;
+
+use crate::{daemon::DaemonClient, file_tree::FileTree};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout},
@@ -6,15 +8,12 @@ use ratatui::{
     text::Span,
     widgets::{Block, Widget},
 };
-use std::io;
-
-const HELP: &str = "? Help";
-const TITLE: &str = "cax";
 
 #[derive(Debug)]
 pub struct App {
     pub exit: bool,
     pub file_tree: FileTree,
+    pub daemon_client: DaemonClient,
 }
 
 impl App {
@@ -49,6 +48,11 @@ impl App {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.exit()
+            }
+            KeyCode::Enter => {
+                let mut path_buf = std::env::home_dir().unwrap();
+                path_buf.push("abc.mp3");
+                self.daemon_client.play(path_buf).expect("cant play");
             }
             KeyCode::Up => self.file_tree.move_up(),
             KeyCode::Down => self.file_tree.move_down(),

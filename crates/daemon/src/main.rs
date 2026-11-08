@@ -1,8 +1,11 @@
 use clap::Command;
-use common::get_socket_name;
+use common::{get_socket_name, msg::ClientMsg};
 use eyre::{Context, bail, eyre};
 use interprocess::local_socket::{ListenerOptions, Stream, prelude::*};
-use std::io::{BufRead, BufReader, Write};
+use std::{
+    io::{BufReader, Read, Write},
+    sync::mpsc::{self, Sender},
+};
 
 const SOCKET_NAME: &str = "curse-daemon.sock";
 
@@ -59,7 +62,7 @@ fn stop() -> eyre::Result<()> {
     let name = get_socket_name()?;
     let mut stream =
         Stream::connect(name).wrap_err_with(|| format!("failed to connect to daemon"))?;
-    stream.write_all(b"stop\n")?;
+    write_all(&mut stream, &postcard::to_allocvec(&ClientMsg::Stop)?)?;
     println!("daemon stopped successfully");
     Ok(())
 }
@@ -70,37 +73,63 @@ fn run() -> eyre::Result<()> {
         .name(name)
         .create_sync()
         .wrap_err_with(|| format!("failed to start daemon"))?;
-
     println!("daemon running at {SOCKET_NAME}");
-    let mut buffer = String::with_capacity(128);
-    for mut conn in listener
-        .incoming()
-        .filter_map(|conn| {
+
+    let (shutdown_tx, shutdown_rx) = mpsc::channel::<()>();
+    std::thread::spawn(move || {
+        for conn in listener.incoming().filter_map(|conn| {
             conn.map_err(|e| eyre!("incoming connection failed: {e}"))
                 .ok()
-        })
-        .map(BufReader::new)
-    {
-        if let Err(e) = conn.read_line(&mut buffer) {
-            eprintln!("failed to read client buffer: {}", e);
-            continue;
+        }) {
+            let shutdown = shutdown_tx.clone();
+            let reader = BufReader::new(conn);
+            std::thread::spawn(move || handle_client(reader, shutdown));
         }
-
-        reply(
-            &mut conn,
-            match buffer.trim() {
-                "stop" => break,
-                "ping" => b"pong\n",
-                _ => b"unknown command\n",
-            },
-        );
-        buffer.clear();
-    }
+    });
+    shutdown_rx.recv()?;
     Ok(())
 }
 
-fn reply(conn: &mut BufReader<Stream>, buf: &[u8]) {
-    if let Err(e) = conn.get_mut().write_all(buf) {
-        eprintln!("failed to reply to client: {}", e);
+fn handle_client(mut conn: BufReader<Stream>, shutdown_tx: Sender<()>) {
+    loop {
+        let mut len_buf = [0u8; 4];
+        if let Err(e) = conn.read_exact(&mut len_buf) {
+            eprintln!("failed to read len buffer: {}", e);
+            continue;
+        }
+
+        let len = u32::from_le_bytes(len_buf) as usize;
+        let mut buf = vec![0u8; len];
+        if let Err(e) = conn.read_exact(&mut buf) {
+            eprintln!("failed to read buffer of len {}: {}", len, e);
+            continue;
+        }
+
+        let msg: ClientMsg = match postcard::from_bytes(&buf) {
+            Ok(msg) => msg,
+            Err(e) => {
+                eprintln!("failed to deserialize buffer: {}", e);
+                continue;
+            }
+        };
+
+        println!("received message len {}: {:?}", len, msg);
+        match msg {
+            ClientMsg::Stop => {
+                if let Err(e) = shutdown_tx.send(()) {
+                    eprintln!("failed to send shutdown signal: {}", e);
+                }
+                break;
+            }
+            ClientMsg::Play(path_buf) => {
+                todo!()
+            }
+        };
     }
+}
+
+fn write_all(stream: &mut Stream, bytes: &[u8]) -> eyre::Result<()> {
+    stream.write_all(&(bytes.len() as u32).to_le_bytes())?;
+    stream.write_all(&bytes)?;
+    Ok(())
 }
