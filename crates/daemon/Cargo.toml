@@ -13,3 +13,4 @@ serde = { workspace = true }
 
 [build-dependencies]
 bindgen = "0.73.2"
+cc = "1.11.1"

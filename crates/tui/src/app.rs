@@ -51,7 +51,8 @@ impl App {
             }
             KeyCode::Enter => {
                 let mut path_buf = std::env::home_dir().unwrap();
-                path_buf.push("abc.mp3");
+                path_buf.push("Downloads");
+                path_buf.push("7⧸16 Irregular Time Signature [858423955].mp3");
                 self.daemon_client.play(path_buf).expect("cant play");
             }
             KeyCode::Up => self.file_tree.move_up(),
