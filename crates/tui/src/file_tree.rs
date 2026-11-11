@@ -4,7 +4,10 @@ use ratatui::{
     text::Line,
     widgets::{Block, Paragraph, Widget},
 };
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug)]
 pub struct FileTree {
@@ -21,23 +24,29 @@ pub struct FileTreeEntry {
 
 impl FileTree {
     pub fn new(cwd: PathBuf) -> eyre::Result<FileTree> {
-        let mut file_tree = FileTree {
+        let entries = Self::read_entries(&cwd)?;
+        let file_tree = FileTree {
             cwd,
-            entries: vec![],
+            entries,
             current_idx: 0,
         };
-        file_tree.update_entries()?;
         Ok(file_tree)
     }
 
+    pub fn get_cwd(&self) -> &Path {
+        &self.cwd
+    }
+
     pub fn set_cwd(&mut self, cwd: PathBuf) -> eyre::Result<()> {
+        let entries = Self::read_entries(&cwd)?;
         self.cwd = cwd;
-        self.update_entries()?;
+        self.entries = entries;
+        self.current_idx = 0;
         Ok(())
     }
 
     pub fn move_down(&mut self) {
-        if self.current_idx < self.entries.len() - 1 {
+        if self.current_idx + 1 < self.entries.len() {
             self.current_idx = self.current_idx + 1;
         }
     }
@@ -46,10 +55,27 @@ impl FileTree {
         self.current_idx = self.current_idx.saturating_sub(1);
     }
 
-    fn update_entries(&mut self) -> eyre::Result<()> {
+    pub fn get_current(&self) -> Option<&FileTreeEntry> {
+        self.entries.get(self.current_idx)
+    }
+
+    fn read_entries(cwd: &Path) -> eyre::Result<Vec<FileTreeEntry>> {
         let mut entries = Vec::new();
-        for entry in fs::read_dir(&self.cwd)? {
+        for entry in fs::read_dir(cwd)? {
             let entry = entry?;
+            let path = entry.path();
+            let is_audio = entry
+                .path()
+                .extension()
+                .and_then(|path| path.to_str())
+                .is_some_and(|ext| {
+                    ext.eq_ignore_ascii_case("mp3")
+                        || ext.eq_ignore_ascii_case("wav")
+                        || ext.eq_ignore_ascii_case("ogg")
+                });
+            if !path.is_dir() && !is_audio {
+                continue;
+            }
             entries.push(FileTreeEntry {
                 path: entry.path(),
                 name: entry
@@ -59,9 +85,7 @@ impl FileTree {
             });
         }
         entries.sort_by(|a, b| a.name.cmp(&b.name));
-        self.entries = entries;
-        self.current_idx = self.current_idx.min(self.entries.len().saturating_sub(1));
-        Ok(())
+        Ok(entries)
     }
 }
 

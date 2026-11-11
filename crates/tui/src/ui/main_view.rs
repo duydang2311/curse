@@ -1,3 +1,4 @@
+use crate::{app::Context, file_tree::FileTree};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout},
@@ -5,8 +6,6 @@ use ratatui::{
     text::Span,
     widgets::{Block, Widget},
 };
-
-use crate::{app::Context, file_tree::FileTree};
 
 #[derive(Debug)]
 pub struct MainView {
@@ -25,10 +24,33 @@ impl MainView {
                 context.exit()
             }
             KeyCode::Enter => {
-                let mut path_buf = std::env::home_dir().unwrap();
-                path_buf.push("Downloads");
-                path_buf.push("7⧸16 Irregular Time Signature [858423955].mp3");
-                context.daemon.play(path_buf).expect("cant play");
+                let Some(current) = self.file_tree.get_current() else {
+                    return Ok(());
+                };
+
+                if current.path.is_dir() {
+                    let _ = self.file_tree.set_cwd(current.path.clone());
+                } else if current.path.extension().is_some_and(|ext| {
+                    ext.eq_ignore_ascii_case("mp3")
+                        || ext.eq_ignore_ascii_case("ogg")
+                        || ext.eq_ignore_ascii_case("wav")
+                }) {
+                    context
+                        .daemon
+                        .play(current.path.clone())
+                        .expect("cant play");
+                }
+                // let mut path_buf = std::env::home_dir().unwrap();
+                // path_buf.push("Downloads");
+                // path_buf.push("7⧸16 Irregular Time Signature [858423955].mp3");
+                // context.daemon.play(path_buf).expect("cant play");
+            }
+            KeyCode::Backspace => {
+                if let Some(parent) = self.file_tree.get_cwd().parent() {
+                    self.file_tree
+                        .set_cwd(parent.to_path_buf())
+                        .expect("failed to go back");
+                }
             }
             KeyCode::Up => self.file_tree.move_up(),
             KeyCode::Down => self.file_tree.move_down(),
