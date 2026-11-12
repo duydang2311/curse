@@ -41,9 +41,13 @@ impl FileTree {
 
     pub fn set_cwd(&mut self, cwd: PathBuf) -> eyre::Result<()> {
         let entries = Self::read_entries(&cwd)?;
-        self.cwd = cwd;
         self.entries = entries;
-        self.current_idx = 0;
+        self.current_idx = self
+            .entries
+            .iter()
+            .position(|e| e.path.eq(&self.cwd))
+            .unwrap_or(0);
+        self.cwd = cwd;
         Ok(())
     }
 
