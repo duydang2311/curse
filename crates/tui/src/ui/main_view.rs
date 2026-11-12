@@ -1,4 +1,4 @@
-use crate::{app::Context, file_tree::FileTree};
+use crate::{app::Context, ui::file_tree::FileTree, utils::has_audio_extension};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout},
@@ -30,20 +30,12 @@ impl MainView {
 
                 if current.path.is_dir() {
                     let _ = self.file_tree.set_cwd(current.path.clone());
-                } else if current.path.extension().is_some_and(|ext| {
-                    ext.eq_ignore_ascii_case("mp3")
-                        || ext.eq_ignore_ascii_case("ogg")
-                        || ext.eq_ignore_ascii_case("wav")
-                }) {
+                } else if has_audio_extension(&current.path) {
                     context
                         .daemon
                         .play(current.path.clone())
                         .expect("cant play");
                 }
-                // let mut path_buf = std::env::home_dir().unwrap();
-                // path_buf.push("Downloads");
-                // path_buf.push("7⧸16 Irregular Time Signature [858423955].mp3");
-                // context.daemon.play(path_buf).expect("cant play");
             }
             KeyCode::Backspace => {
                 if let Some(parent) = self.file_tree.get_cwd().parent() {

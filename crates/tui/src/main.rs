@@ -1,13 +1,12 @@
-use std::env;
-
 use crate::{
-    app::App, app::Context, daemon::DaemonClient, file_tree::FileTree, ui::main_view::MainView,
+    app::App, app::Context, daemon::DaemonClient, ui::file_tree::FileTree, ui::main_view::MainView,
 };
+use std::env;
 
 mod app;
 mod daemon;
-mod file_tree;
 mod ui;
+mod utils;
 
 fn main() -> eyre::Result<()> {
     ratatui::run(|term| {

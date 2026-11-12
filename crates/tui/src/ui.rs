@@ -2,6 +2,7 @@ use crossterm::event::KeyEvent;
 
 use crate::{app::Context, ui::main_view::MainView};
 
+pub mod file_tree;
 pub mod main_view;
 
 #[derive(Debug)]

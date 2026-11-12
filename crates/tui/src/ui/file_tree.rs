@@ -9,6 +9,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::utils::has_audio_extension;
+
 #[derive(Debug)]
 pub struct FileTree {
     cwd: PathBuf,
@@ -64,15 +66,7 @@ impl FileTree {
         for entry in fs::read_dir(cwd)? {
             let entry = entry?;
             let path = entry.path();
-            let is_audio = entry
-                .path()
-                .extension()
-                .and_then(|path| path.to_str())
-                .is_some_and(|ext| {
-                    ext.eq_ignore_ascii_case("mp3")
-                        || ext.eq_ignore_ascii_case("wav")
-                        || ext.eq_ignore_ascii_case("ogg")
-                });
+            let is_audio = has_audio_extension(&entry.path());
             if !path.is_dir() && !is_audio {
                 continue;
             }
