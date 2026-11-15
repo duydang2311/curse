@@ -9,14 +9,22 @@ use crate::{
 use common::{get_socket_name, msg::ClientMsg};
 use eyre::{Context, bail, eyre};
 use interprocess::local_socket::{ListenerOptions, Stream, prelude::*};
-use std::{env, io::Write, process, sync::mpsc, thread};
+use std::{
+    env,
+    io::{ErrorKind, Write},
+    process,
+    sync::mpsc,
+    thread,
+    time::Duration,
+};
 
 const SOCKET_NAME: &str = "curse-daemon.sock";
 
 pub fn start() -> eyre::Result<()> {
     let name = get_socket_name()?;
     if let Ok(_) = Stream::connect(name) {
-        bail!("daemon is already running")
+        println!("daemon is already running");
+        return Ok(());
     }
     let exe = env::current_exe()?;
     let mut cmd = process::Command::new(exe);
@@ -51,12 +59,23 @@ pub fn stop() -> eyre::Result<()> {
 
 pub fn run() -> eyre::Result<()> {
     let name = get_socket_name()?;
-    let listener = ListenerOptions::new()
-        .name(name)
-        .create_sync()
-        .wrap_err_with(|| format!("failed to start daemon"))?;
-    println!("daemon running at {SOCKET_NAME}");
+    let listener = match ListenerOptions::new().name(name.clone()).create_sync() {
+        Err(e) if e.kind() == ErrorKind::AddrInUse => {
+            if Stream::connect(name.clone()).is_ok() {
+                bail!("daemon is already running");
+            }
+            ListenerOptions::new()
+                .name(name.clone())
+                .try_overwrite(true)
+                .max_spin_time(Duration::from_millis(500))
+                .create_sync()
+                .wrap_err("failed to start daemon")?
+        }
+        Err(e) => return Err(e).wrap_err("failed to start daemon"),
+        Ok(l) => l,
+    };
 
+    println!("daemon running at {SOCKET_NAME}");
     let (app_tx, app_rx) = mpsc::channel::<AppMsg>();
     let (audio_tx, audio_rx) = mpsc::channel::<AudioMsg>();
     let app = App::new(app_tx, audio_tx.clone());
