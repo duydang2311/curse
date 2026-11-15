@@ -1,5 +1,5 @@
 use crate::{daemon::DaemonClient, ui::View};
-use crossterm::event::{self, Event, KeyEvent, KeyEventKind};
+use crossterm::event::{self, Event, KeyEventKind};
 
 #[derive(Debug)]
 pub struct App {
@@ -33,15 +33,11 @@ impl App {
     fn handle_events(&mut self) -> eyre::Result<()> {
         match event::read()? {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_event(key_event)?
+                self.view.handle_key_event(key_event, &mut self.context)?
             }
             _ => {}
         };
         Ok(())
-    }
-
-    fn handle_key_event(&mut self, key_event: KeyEvent) -> eyre::Result<()> {
-        self.view.handle_key_event(key_event, &mut self.context)
     }
 }
 
