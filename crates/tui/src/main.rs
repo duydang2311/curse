@@ -1,3 +1,5 @@
+use common::spawn::spawn_daemon_detached;
+
 use crate::{
     app::App, app::Context, daemon::DaemonClient, ui::file_tree::FileTree, ui::main_view::MainView,
 };
@@ -9,6 +11,7 @@ mod ui;
 mod utils;
 
 fn main() -> eyre::Result<()> {
+    spawn_daemon_detached()?;
     ratatui::run(|term| {
         App {
             context: Context {
