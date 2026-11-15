@@ -1,6 +1,5 @@
 use crate::{daemon::DaemonClient, ui::View};
 use crossterm::event::{self, Event, KeyEvent, KeyEventKind};
-use ratatui::widgets::Widget;
 
 #[derive(Debug)]
 pub struct App {
@@ -17,14 +16,18 @@ pub struct Context {
 impl App {
     pub fn run(&mut self, term: &mut ratatui::DefaultTerminal) -> eyre::Result<()> {
         while !self.context.exit {
-            term.draw(|frame| self.draw(frame))?;
+            let mut last_draw_result = Ok(());
+            term.draw(|frame| {
+                last_draw_result = self.draw(frame);
+            })?;
+            last_draw_result?;
             self.handle_events()?;
         }
         Ok(())
     }
 
-    fn draw(&mut self, frame: &mut ratatui::Frame) {
-        frame.render_widget(self, frame.area());
+    fn draw(&mut self, frame: &mut ratatui::Frame) -> eyre::Result<()> {
+        self.view.draw(frame)
     }
 
     fn handle_events(&mut self) -> eyre::Result<()> {
@@ -45,16 +48,5 @@ impl App {
 impl Context {
     pub fn exit(&mut self) {
         self.exit = true;
-    }
-}
-
-impl Widget for &mut App {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
-        Self: Sized,
-    {
-        if let Err(e) = self.view.draw(area, buf) {
-            eprintln!("failed to draw current view: {}", e);
-        }
     }
 }

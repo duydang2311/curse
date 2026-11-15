@@ -11,13 +11,9 @@ pub enum View {
 }
 
 impl View {
-    pub fn draw(
-        &mut self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
-    ) -> eyre::Result<()> {
+    pub fn draw(&mut self, frame: &mut ratatui::Frame) -> eyre::Result<()> {
         match self {
-            View::Main(main_view) => main_view.draw(area, buf),
+            View::Main(main_view) => main_view.draw(frame),
         }
     }
 

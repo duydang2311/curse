@@ -51,11 +51,9 @@ impl MainView {
         Ok(())
     }
 
-    pub fn draw(
-        &mut self,
-        area: ratatui::prelude::Rect,
-        buf: &mut ratatui::prelude::Buffer,
-    ) -> eyre::Result<()> {
+    pub fn draw(&mut self, frame: &mut ratatui::Frame) -> eyre::Result<()> {
+        let area = frame.area();
+        let buf = frame.buffer_mut();
         let [top, bottom] =
             Layout::vertical(vec![Constraint::Fill(1), Constraint::Length(1)]).areas(area);
         let [top_left, top_right] =
