@@ -1,4 +1,4 @@
-use crate::{app::Context, ui::file_tree::FileTree, utils::has_audio_extension};
+use crate::{app::AppContext, ui::file_tree::FileTree, utils::has_audio_extension};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout},
@@ -16,7 +16,7 @@ impl MainView {
     pub fn handle_key_event(
         &mut self,
         key_event: KeyEvent,
-        context: &mut Context,
+        context: &mut AppContext,
     ) -> eyre::Result<()> {
         match key_event.code {
             KeyCode::Char('q') => context.exit(),

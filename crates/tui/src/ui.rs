@@ -1,6 +1,6 @@
 use crossterm::event::KeyEvent;
 
-use crate::{app::Context, ui::main_view::MainView};
+use crate::{app::AppContext, ui::main_view::MainView};
 
 pub mod file_tree;
 pub mod main_view;
@@ -20,7 +20,7 @@ impl View {
     pub fn handle_key_event(
         &mut self,
         key_event: KeyEvent,
-        context: &mut Context,
+        context: &mut AppContext,
     ) -> eyre::Result<()> {
         match self {
             View::Main(main_view) => main_view.handle_key_event(key_event, context),
