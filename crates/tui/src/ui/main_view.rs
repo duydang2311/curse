@@ -51,7 +51,7 @@ impl MainView {
         Ok(())
     }
 
-    pub fn draw(&mut self, frame: &mut ratatui::Frame) -> eyre::Result<()> {
+    pub fn draw(&self, frame: &mut ratatui::Frame) -> eyre::Result<()> {
         let area = frame.area();
         let buf = frame.buffer_mut();
         let [top, bottom] =

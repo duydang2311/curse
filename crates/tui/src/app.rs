@@ -1,6 +1,10 @@
-use crate::{daemon::DaemonClient, ui::View};
+use crate::{daemon::Daemon, ui::View};
 use crossterm::event::KeyEvent;
-use std::sync::mpsc::{Receiver, Sender};
+use interprocess::local_socket::Stream;
+use std::sync::{
+    Arc,
+    mpsc::{Receiver, Sender},
+};
 
 #[derive(Debug)]
 pub struct App {
@@ -13,7 +17,7 @@ pub struct AppContext {
     pub tx: Sender<AppEvent>,
     pub rx: Receiver<AppEvent>,
     pub exited: bool,
-    pub daemon: DaemonClient,
+    pub daemon: Daemon,
 }
 
 #[derive(Debug)]
@@ -21,16 +25,18 @@ pub enum AppEvent {
     #[allow(dead_code)]
     Tick,
     Key(KeyEvent),
+    DaemonConnected(Arc<Stream>),
+    DaemonDisconnected(Arc<Stream>),
 }
 
 impl App {
-    pub fn new(tx: Sender<AppEvent>, rx: Receiver<AppEvent>, view: View) -> App {
+    pub fn new(tx: Sender<AppEvent>, rx: Receiver<AppEvent>, view: View, daemon: Daemon) -> App {
         App {
             context: AppContext {
                 tx,
                 rx,
                 exited: false,
-                daemon: DaemonClient::new(),
+                daemon,
             },
             view,
         }
