@@ -2,9 +2,9 @@ use crate::{
     app::{App, AppMsg},
     audio::{
         AudioMsg::{self},
-        run_audio_thread,
+        spawn_audio_thread,
     },
-    listener::run_listener_thread,
+    client::spawn_client_thread,
 };
 use common::{get_socket_name, msg::ClientMsg, spawn::spawn_daemon_detached};
 use eyre::{Context, bail, eyre};
@@ -12,7 +12,6 @@ use interprocess::local_socket::{ListenerOptions, Stream, prelude::*};
 use std::{
     io::{ErrorKind, Write},
     sync::mpsc,
-    thread,
     time::Duration,
 };
 
@@ -54,14 +53,8 @@ pub fn run() -> eyre::Result<()> {
     let (audio_tx, audio_rx) = mpsc::channel::<AudioMsg>();
     let app = App::new(app_tx, audio_tx.clone());
 
-    thread::spawn(move || {
-        let app = app.clone();
-        run_listener_thread(listener, app);
-    });
-
-    let audio_handle = thread::spawn(|| {
-        run_audio_thread(audio_rx);
-    });
+    let client_handle = spawn_client_thread(listener, app.clone());
+    let audio_handle = spawn_audio_thread(app.clone(), audio_rx);
 
     app_rx.recv()?;
 

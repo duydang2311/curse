@@ -6,14 +6,18 @@ use std::{
     path::PathBuf,
     ptr,
     sync::mpsc,
+    thread::{self, JoinHandle},
 };
 
+use common::msg::ServerMsg;
 use daemon::{
     ma_decoder, ma_decoder_init_file_w, ma_decoder_read_pcm_frames, ma_decoder_uninit, ma_device,
     ma_device_config_init, ma_device_init, ma_device_start, ma_device_type_ma_device_type_playback,
     ma_device_uninit, ma_result_MA_SUCCESS,
 };
 use eyre::bail;
+
+use crate::app::App;
 
 pub enum AudioMsg {
     Play(PathBuf),
@@ -27,7 +31,6 @@ pub struct Playback {
 
 impl Drop for Playback {
     fn drop(&mut self) {
-        println!("drop");
         unsafe {
             ma_device_uninit(&mut *self.device);
             ma_decoder_uninit(&mut *self.decoder);
@@ -35,24 +38,27 @@ impl Drop for Playback {
     }
 }
 
-pub fn run_audio_thread(rx: mpsc::Receiver<AudioMsg>) {
-    let mut playback: Option<Playback> = None;
-    loop {
-        match rx.recv() {
-            Ok(AudioMsg::Play(path_buf)) => match play(&path_buf) {
-                Ok(pb) => {
-                    playback = Some(pb);
-                }
+pub fn spawn_audio_thread(app: App, rx: mpsc::Receiver<AudioMsg>) -> JoinHandle<()> {
+    thread::spawn(move || {
+        let mut playback: Option<Playback> = None;
+        loop {
+            match rx.recv() {
+                Ok(AudioMsg::Play(path_buf)) => match play(&path_buf) {
+                    Ok(pb) => {
+                        playback = Some(pb);
+                        app.clients.broadcast(&ServerMsg::TrackStarted(path_buf));
+                    }
+                    Err(e) => {
+                        eprintln!("failed to play {}: {}", &path_buf.display(), e);
+                    }
+                },
+                Ok(AudioMsg::Shutdown) => break,
                 Err(e) => {
-                    eprintln!("failed to play {}: {}", &path_buf.display(), e);
+                    eprintln!("failed to receive audio msg: {}", e);
                 }
-            },
-            Ok(AudioMsg::Shutdown) => break,
-            Err(e) => {
-                eprintln!("failed to receive audio msg: {}", e);
             }
         }
-    }
+    })
 }
 
 fn to_wide(s: &OsStr) -> Vec<u16> {

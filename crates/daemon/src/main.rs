@@ -2,8 +2,8 @@ use clap::Command;
 
 mod app;
 mod audio;
+mod client;
 mod cmds;
-mod listener;
 
 fn cli() -> Command {
     Command::new("curse-daemon")
