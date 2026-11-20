@@ -1,35 +1,33 @@
-use crossterm::event::KeyEvent;
-
-use crate::{app::AppContext, ui::main_view::MainView};
+use crate::{
+    app::{AppMsg, Cmd},
+    ui::main_screen::MainScreen,
+};
 
 pub mod file_tree;
-pub mod main_view;
+pub mod main_screen;
+pub mod now_playing;
 
 #[derive(Debug)]
-pub enum View {
-    Main(MainView),
+pub enum Screen {
+    Main(MainScreen),
 }
 
-impl View {
-    pub fn draw(&mut self, frame: &mut ratatui::Frame) -> eyre::Result<()> {
+impl Screen {
+    pub fn update(&mut self, msg: AppMsg) -> Cmd {
         match self {
-            View::Main(main_view) => main_view.draw(frame),
+            Screen::Main(screen) => screen.update(msg),
         }
     }
 
-    pub fn handle_key_event(
-        &mut self,
-        key_event: KeyEvent,
-        context: &mut AppContext,
-    ) -> eyre::Result<()> {
+    pub fn view(&self, frame: &mut ratatui::Frame) {
         match self {
-            View::Main(main_view) => main_view.handle_key_event(key_event, context),
+            Screen::Main(screen) => screen.view(frame),
         }
     }
 }
 
-impl Into<View> for MainView {
-    fn into(self) -> View {
-        View::Main(self)
+impl From<MainScreen> for Screen {
+    fn from(screen: MainScreen) -> Screen {
+        Screen::Main(screen)
     }
 }

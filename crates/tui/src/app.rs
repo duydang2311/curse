@@ -1,58 +1,56 @@
-use crate::{daemon::Daemon, ui::View};
-use crossterm::event::KeyEvent;
-use interprocess::local_socket::Stream;
-use std::sync::{
-    Arc,
-    mpsc::{Receiver, Sender},
-};
+use crate::ui::Screen;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct App {
-    pub context: AppContext,
-    pub view: View,
+    pub running: bool,
+    screen: Screen,
 }
 
 #[derive(Debug)]
-pub struct AppContext {
-    pub tx: Sender<AppEvent>,
-    pub rx: Receiver<AppEvent>,
-    pub exited: bool,
-    pub daemon: Daemon,
-}
-
-#[derive(Debug)]
-pub enum AppEvent {
-    #[allow(dead_code)]
-    Tick,
+pub enum AppMsg {
     Key(KeyEvent),
-    DaemonConnected(Arc<Stream>),
-    DaemonDisconnected(Arc<Stream>),
+    DaemonConnected,
+    DaemonDisconnected,
+    TrackStarted(PathBuf),
+    Error(String),
+}
+
+#[derive(Debug)]
+#[must_use]
+pub enum Cmd {
+    None,
+    Play(PathBuf),
 }
 
 impl App {
-    pub fn new(tx: Sender<AppEvent>, rx: Receiver<AppEvent>, view: View, daemon: Daemon) -> App {
+    pub fn new(screen: Screen) -> App {
         App {
-            context: AppContext {
-                tx,
-                rx,
-                exited: false,
-                daemon,
-            },
-            view,
+            running: true,
+            screen,
         }
     }
 
-    pub fn draw(&mut self, frame: &mut ratatui::Frame) -> eyre::Result<()> {
-        self.view.draw(frame)
+    pub fn update(&mut self, msg: AppMsg) -> Cmd {
+        if let AppMsg::Key(k) = &msg
+            && is_quit(k)
+        {
+            self.running = false;
+            return Cmd::None;
+        }
+        self.screen.update(msg)
+    }
+
+    pub fn view(&self, frame: &mut ratatui::Frame) {
+        self.screen.view(frame);
     }
 }
 
-impl AppContext {
-    pub fn exit(&mut self) {
-        self.exited = true;
-    }
-
-    pub fn tick(&self) -> eyre::Result<()> {
-        Ok(self.tx.send(AppEvent::Tick)?)
+fn is_quit(k: &KeyEvent) -> bool {
+    match k.code {
+        KeyCode::Char('q') => true,
+        KeyCode::Char('c') => k.modifiers.contains(KeyModifiers::CONTROL),
+        _ => false,
     }
 }
