@@ -1,14 +1,10 @@
-use std::path::PathBuf;
-
+use crate::elm::{self, View};
 use ratatui::{
-    buffer::Buffer,
-    layout::Rect,
     symbols::border,
     text::Line,
     widgets::{Block, Paragraph, Widget},
 };
-
-use crate::app::AppMsg;
+use std::path::PathBuf;
 
 const TITLE: &str = "Now playing";
 
@@ -17,18 +13,8 @@ pub struct NowPlaying {
     track: Option<PathBuf>,
 }
 
-impl NowPlaying {
-    pub fn update(&mut self, msg: &AppMsg) {
-        match msg {
-            AppMsg::TrackStarted(track) => self.track = Some(track.clone()),
-            AppMsg::DaemonDisconnected => self.track = None,
-            _ => {}
-        }
-    }
-}
-
-impl Widget for &NowPlaying {
-    fn render(self, area: Rect, buf: &mut Buffer) {
+impl View for NowPlaying {
+    fn view(&self, area: ratatui::prelude::Rect, buffer: &mut ratatui::prelude::Buffer) {
         let block = Block::bordered().border_set(border::ROUNDED).title(TITLE);
         let line = match &self.track {
             None => Line::raw("Nothing playing"),
@@ -39,6 +25,15 @@ impl Widget for &NowPlaying {
                     .to_string_lossy(),
             ),
         };
-        Paragraph::new(line).block(block).render(area, buf);
+        Paragraph::new(line).block(block).render(area, buffer);
+    }
+
+    fn update(&mut self, msg: &elm::Message) -> eyre::Result<elm::Command> {
+        match msg {
+            elm::Message::TrackStarted(track) => self.track = Some(track.clone()),
+            elm::Message::DaemonDisconnected => self.track = None,
+            _ => {}
+        }
+        Ok(elm::Command::None)
     }
 }

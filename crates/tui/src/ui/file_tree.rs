@@ -1,3 +1,6 @@
+use crate::{elm, utils::has_audio_extension};
+use crossterm::event::KeyCode;
+use eyre::OptionExt;
 use ratatui::{
     style::{Color, Style},
     symbols::border,
@@ -8,8 +11,6 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-
-use crate::utils::has_audio_extension;
 
 #[derive(Debug)]
 pub struct FileTree {
@@ -89,11 +90,8 @@ impl FileTree {
 
 const TITLE: &str = "File system";
 
-impl Widget for &FileTree {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
-        Self: Sized,
-    {
+impl elm::View for FileTree {
+    fn view(&self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
         let block = Block::bordered().border_set(border::ROUNDED).title(TITLE);
         let height = block.inner(area).height as usize;
         let lines: Vec<Line> = self
@@ -113,5 +111,33 @@ impl Widget for &FileTree {
             .collect();
         let paragraph = Paragraph::new(lines).block(block);
         paragraph.render(area, buf);
+    }
+
+    fn update(&mut self, msg: &elm::Message) -> eyre::Result<elm::Command> {
+        let elm::Message::Key(k) = msg else {
+            return Ok(elm::Command::None);
+        };
+        match k.code {
+            KeyCode::Enter => {
+                let current = self
+                    .get_current()
+                    .ok_or_eyre("failed to get current path")?;
+                let path = current.path.clone();
+                if path.is_dir() {
+                    self.set_cwd(path)?;
+                } else if has_audio_extension(&path) {
+                    return Ok(elm::Command::Play(path));
+                }
+            }
+            KeyCode::Backspace => {
+                if let Some(parent) = self.get_cwd().parent() {
+                    self.set_cwd(parent.to_path_buf())?;
+                }
+            }
+            KeyCode::Up => self.move_up(),
+            KeyCode::Down => self.move_down(),
+            _ => {}
+        }
+        Ok(elm::Command::None)
     }
 }

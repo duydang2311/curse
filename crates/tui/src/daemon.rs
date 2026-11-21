@@ -1,4 +1,4 @@
-use crate::app::AppMsg;
+use crate::elm;
 use common::{
     get_socket_name,
     msg::{ClientMsg, ServerMsg, write_frame},
@@ -46,27 +46,30 @@ fn connect_daemon() -> eyre::Result<Stream> {
     Ok(Stream::connect(get_socket_name()?)?)
 }
 
-pub fn spawn_daemon_thread(daemon: Daemon, tx: Sender<AppMsg>) -> JoinHandle<eyre::Result<()>> {
+pub fn spawn_daemon_thread(
+    daemon: Daemon,
+    tx: Sender<elm::Message>,
+) -> JoinHandle<eyre::Result<()>> {
     thread::spawn(move || -> eyre::Result<()> {
         loop {
             match connect_daemon() {
                 Ok(s) => {
                     let s = Arc::new(s);
                     daemon.set_stream(Some(s.clone()));
-                    tx.send(AppMsg::DaemonConnected)?;
+                    tx.send(elm::Message::DaemonConnected)?;
                     let result = read_daemon(&s, &tx);
                     daemon.set_stream(None);
                     result?;
-                    tx.send(AppMsg::DaemonDisconnected)?;
+                    tx.send(elm::Message::DaemonDisconnected)?;
                 }
-                Err(e) => tx.send(AppMsg::Error(e.to_string()))?,
+                Err(e) => tx.send(elm::Message::Error(e.to_string()))?,
             }
             thread::sleep(Duration::from_secs(1));
         }
     })
 }
 
-fn read_daemon(mut s: &Stream, tx: &Sender<AppMsg>) -> Result<(), SendError<AppMsg>> {
+fn read_daemon(mut s: &Stream, tx: &Sender<elm::Message>) -> Result<(), SendError<elm::Message>> {
     loop {
         let mut len_buf = [0u8; 4];
         if s.read_exact(&mut len_buf).is_err() {
@@ -85,10 +88,10 @@ fn read_daemon(mut s: &Stream, tx: &Sender<AppMsg>) -> Result<(), SendError<AppM
     }
 }
 
-impl From<ServerMsg> for AppMsg {
-    fn from(msg: ServerMsg) -> AppMsg {
+impl From<ServerMsg> for elm::Message {
+    fn from(msg: ServerMsg) -> elm::Message {
         match msg {
-            ServerMsg::TrackStarted(track) => AppMsg::TrackStarted(track),
+            ServerMsg::TrackStarted(track) => elm::Message::TrackStarted(track),
         }
     }
 }

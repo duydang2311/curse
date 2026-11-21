@@ -1,5 +1,5 @@
 use crate::{
-    app::{AppMsg, Cmd},
+    elm::{self, View},
     ui::main_screen::MainScreen,
 };
 
@@ -12,16 +12,16 @@ pub enum Screen {
     Main(MainScreen),
 }
 
-impl Screen {
-    pub fn update(&mut self, msg: AppMsg) -> Cmd {
+impl View for Screen {
+    fn update(&mut self, msg: &elm::Message) -> eyre::Result<elm::Command> {
         match self {
             Screen::Main(screen) => screen.update(msg),
         }
     }
 
-    pub fn view(&self, frame: &mut ratatui::Frame) {
+    fn view(&self, area: ratatui::prelude::Rect, buffer: &mut ratatui::prelude::Buffer) {
         match self {
-            Screen::Main(screen) => screen.view(frame),
+            Screen::Main(screen) => screen.view(area, buffer),
         }
     }
 }
