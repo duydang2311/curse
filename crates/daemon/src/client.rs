@@ -2,7 +2,7 @@ use crate::{
     app::{App, AppMsg},
     audio::AudioMsg,
 };
-use common::msg::{ClientMsg, ServerMsg, write_frame};
+use common::msg::{ClientMsg, ServerMsg, Snapshot, write_frame};
 use eyre::eyre;
 use interprocess::local_socket::{Listener, Stream, prelude::*};
 use std::{
@@ -77,15 +77,23 @@ fn handle_client(stream: Arc<Stream>, app: App) {
             }
         };
 
-        println!("received message len {}: {:?}", len, msg);
         match msg {
-            ClientMsg::Stop => {
+            ClientMsg::Handshake => {
+                let _ = write_frame(
+                    &*stream,
+                    &&ServerMsg::Handshake(Snapshot {
+                        current_track: app.current_track(),
+                    }),
+                );
+            }
+            ClientMsg::Shutdown => {
                 if let Err(e) = app.tx.send(AppMsg::Shutdown) {
                     eprintln!("failed to send shutdown signal: {}", e);
                 }
                 break;
             }
             ClientMsg::Play(path_buf) => {
+                app.set_current_track(path_buf.clone());
                 if let Err(e) = app.audio_tx.send(AudioMsg::Play(path_buf)) {
                     eprintln!("failed to send play audio msg: {}", e);
                 }

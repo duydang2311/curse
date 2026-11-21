@@ -1,3 +1,4 @@
+use common::msg::Snapshot;
 use crossterm::event::KeyEvent;
 use std::path::PathBuf;
 
@@ -6,8 +7,8 @@ use crate::elm;
 #[derive(Debug)]
 pub enum Message {
     Key(KeyEvent),
-    DaemonConnected,
     DaemonDisconnected,
+    Handshake(Snapshot),
     TrackStarted(PathBuf),
     Error(String),
 }

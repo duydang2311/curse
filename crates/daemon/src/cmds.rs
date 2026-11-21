@@ -25,7 +25,7 @@ pub fn stop() -> eyre::Result<()> {
     let name = get_socket_name()?;
     let mut stream =
         Stream::connect(name).wrap_err_with(|| format!("failed to connect to daemon"))?;
-    write_all(&mut stream, &postcard::to_allocvec(&ClientMsg::Stop)?)?;
+    write_all(&mut stream, &postcard::to_allocvec(&ClientMsg::Shutdown)?)?;
     println!("daemon stopped successfully");
     Ok(())
 }
@@ -53,7 +53,7 @@ pub fn run() -> eyre::Result<()> {
     let (audio_tx, audio_rx) = mpsc::channel::<AudioMsg>();
     let app = App::new(app_tx, audio_tx.clone());
 
-    let client_handle = spawn_client_thread(listener, app.clone());
+    spawn_client_thread(listener, app.clone());
     let audio_handle = spawn_audio_thread(app.clone(), audio_rx);
 
     app_rx.recv()?;

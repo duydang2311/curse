@@ -1,7 +1,7 @@
 use crate::elm;
 use common::{
     get_socket_name,
-    msg::{ClientMsg, ServerMsg, write_frame},
+    msg::{ClientMsg, ServerMsg, read_frame, write_frame},
 };
 use eyre::eyre;
 use interprocess::local_socket::{Stream, prelude::*};
@@ -55,8 +55,13 @@ pub fn spawn_daemon_thread(
             match connect_daemon() {
                 Ok(s) => {
                     let s = Arc::new(s);
+                    let ServerMsg::Handshake(snapshot) =
+                        write_frame(&*s, &ClientMsg::Handshake).and_then(|_| read_frame(&*s))?
+                    else {
+                        continue;
+                    };
                     daemon.set_stream(Some(s.clone()));
-                    tx.send(elm::Message::DaemonConnected)?;
+                    tx.send(elm::Message::Handshake(snapshot))?;
                     let result = read_daemon(&s, &tx);
                     daemon.set_stream(None);
                     result?;
@@ -69,28 +74,22 @@ pub fn spawn_daemon_thread(
     })
 }
 
-fn read_daemon(mut s: &Stream, tx: &Sender<elm::Message>) -> Result<(), SendError<elm::Message>> {
+fn read_daemon(s: &Stream, tx: &Sender<elm::Message>) -> Result<(), SendError<elm::Message>> {
     loop {
-        let mut len_buf = [0u8; 4];
-        if s.read_exact(&mut len_buf).is_err() {
-            return Ok(());
-        }
-
-        let len = u32::from_le_bytes(len_buf) as usize;
-        let mut buf = vec![0u8; len];
-        if s.read_exact(&mut buf).is_err() {
-            return Ok(());
-        }
-
-        if let Ok(msg) = postcard::from_bytes::<ServerMsg>(&buf) {
-            tx.send(msg.into())?;
-        }
+        let msg: ServerMsg = match read_frame(s) {
+            Ok(msg) => msg,
+            Err(_) => {
+                return Ok(());
+            }
+        };
+        tx.send(msg.into())?;
     }
 }
 
 impl From<ServerMsg> for elm::Message {
     fn from(msg: ServerMsg) -> elm::Message {
         match msg {
+            ServerMsg::Handshake(snapshot) => elm::Message::Handshake(snapshot),
             ServerMsg::TrackStarted(track) => elm::Message::TrackStarted(track),
         }
     }

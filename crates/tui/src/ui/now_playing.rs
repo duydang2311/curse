@@ -1,4 +1,4 @@
-use crate::elm::{self, View};
+use crate::elm;
 use ratatui::{
     symbols::border,
     text::Line,
@@ -13,7 +13,7 @@ pub struct NowPlaying {
     track: Option<PathBuf>,
 }
 
-impl View for NowPlaying {
+impl elm::View for NowPlaying {
     fn view(&self, area: ratatui::prelude::Rect, buffer: &mut ratatui::prelude::Buffer) {
         let block = Block::bordered().border_set(border::ROUNDED).title(TITLE);
         let line = match &self.track {
@@ -32,6 +32,9 @@ impl View for NowPlaying {
         match msg {
             elm::Message::TrackStarted(track) => self.track = Some(track.clone()),
             elm::Message::DaemonDisconnected => self.track = None,
+            elm::Message::Handshake(snapshot) => {
+                self.track = snapshot.current_track.clone();
+            }
             _ => {}
         }
         Ok(elm::Command::None)

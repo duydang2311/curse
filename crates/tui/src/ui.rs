@@ -1,7 +1,4 @@
-use crate::{
-    elm::{self, View},
-    ui::main_screen::MainScreen,
-};
+use crate::{elm, ui::main_screen::MainScreen};
 
 pub mod file_tree;
 pub mod main_screen;
@@ -12,7 +9,7 @@ pub enum Screen {
     Main(MainScreen),
 }
 
-impl View for Screen {
+impl elm::View for Screen {
     fn update(&mut self, msg: &elm::Message) -> eyre::Result<elm::Command> {
         match self {
             Screen::Main(screen) => screen.update(msg),
