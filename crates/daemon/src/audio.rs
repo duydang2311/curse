@@ -61,7 +61,7 @@ pub fn spawn_audio_thread(app: App, rx: mpsc::Receiver<AudioMsg>) -> JoinHandle<
 #[cfg(windows)]
 fn init_decoder(path: &Path, decoder: &mut ma_decoder) -> eyre::Result<ma_result> {
     use daemon::ma_decoder_init_file_w;
-    use std::{ffi::OsStr, iter::once, os::windows::ffi::OsStrExt};
+    use std::{iter::once, os::windows::ffi::OsStrExt};
 
     let wide: Vec<u16> = path.as_os_str().encode_wide().chain(once(0)).collect();
     Ok(unsafe { ma_decoder_init_file_w(wide.as_ptr(), ptr::null(), &mut *decoder) })
