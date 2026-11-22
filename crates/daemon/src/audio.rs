@@ -1,21 +1,18 @@
+use common::msg::ServerMsg;
+use daemon::{
+    ma_decoder, ma_decoder_read_pcm_frames, ma_decoder_uninit, ma_device, ma_device_config_init,
+    ma_device_init, ma_device_start, ma_device_type_ma_device_type_playback, ma_device_uninit,
+    ma_result, ma_result_MA_SUCCESS,
+};
+use eyre::bail;
 use std::{
-    ffi::{OsStr, c_void},
-    iter::once,
+    ffi::c_void,
     mem,
-    os::windows::ffi::OsStrExt,
-    path::PathBuf,
+    path::{Path, PathBuf},
     ptr,
     sync::mpsc,
     thread::{self, JoinHandle},
 };
-
-use common::msg::ServerMsg;
-use daemon::{
-    ma_decoder, ma_decoder_init_file_w, ma_decoder_read_pcm_frames, ma_decoder_uninit, ma_device,
-    ma_device_config_init, ma_device_init, ma_device_start, ma_device_type_ma_device_type_playback,
-    ma_device_uninit, ma_result_MA_SUCCESS,
-};
-use eyre::bail;
 
 use crate::app::App;
 
@@ -61,19 +58,27 @@ pub fn spawn_audio_thread(app: App, rx: mpsc::Receiver<AudioMsg>) -> JoinHandle<
     })
 }
 
-fn to_wide(s: &OsStr) -> Vec<u16> {
-    OsStr::new(s).encode_wide().chain(once(0)).collect()
+#[cfg(windows)]
+fn init_decoder(path: &Path, decoder: &mut ma_decoder) -> eyre::Result<ma_result> {
+    use daemon::ma_decoder_init_file_w;
+    use std::{ffi::OsStr, iter::once, os::windows::ffi::OsStrExt};
+
+    let wide: Vec<u16> = path.as_os_str().encode_wide().chain(once(0)).collect();
+    Ok(unsafe { ma_decoder_init_file_w(wide.as_ptr(), ptr::null(), &mut *decoder) })
 }
 
-fn play(path_buf: &PathBuf) -> eyre::Result<Playback> {
+#[cfg(unix)]
+fn init_decoder(path: &Path, decoder: &mut ma_decoder) -> eyre::Result<ma_result> {
+    use daemon::ma_decoder_init_file;
+    use std::{ffi::CString, os::unix::ffi::OsStrExt};
+
+    let c_path = CString::new(path.as_os_str().as_bytes())?;
+    Ok(unsafe { ma_decoder_init_file(c_path.as_ptr(), ptr::null(), &mut *decoder) })
+}
+
+fn play(path: &Path) -> eyre::Result<Playback> {
     let mut decoder: Box<ma_decoder> = Box::new(unsafe { mem::zeroed() });
-    let result = unsafe {
-        ma_decoder_init_file_w(
-            to_wide(path_buf.as_os_str()).as_ptr(),
-            ptr::null(),
-            &mut *decoder,
-        )
-    };
+    let result = init_decoder(path, &mut decoder)?;
     if result != ma_result_MA_SUCCESS {
         bail!("failed to load file: code {}", result)
     }
@@ -109,7 +114,7 @@ fn play(path_buf: &PathBuf) -> eyre::Result<Playback> {
 extern "C" fn data_callback(
     device: *mut ma_device,
     output: *mut c_void,
-    input: *const c_void,
+    _input: *const c_void,
     frame_count: u32,
 ) {
     let decoder = unsafe { (*device).pUserData as *mut ma_decoder };
