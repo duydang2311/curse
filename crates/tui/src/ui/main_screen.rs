@@ -1,7 +1,10 @@
+use std::env;
+
 use crate::{
     elm,
-    ui::{file_tree::FileTree, now_playing::NowPlaying},
+    ui::{Screen, file_tree::FileTree, now_playing::NowPlaying},
 };
+use crossterm::event::KeyCode;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
@@ -25,6 +28,20 @@ impl MainScreen {
             error: None,
         }
     }
+
+    pub fn from_current_dir() -> eyre::Result<MainScreen> {
+        let cwd = match env::current_dir() {
+            Ok(path) => path,
+            Err(e) => env::home_dir().ok_or(e)?,
+        };
+        Ok(MainScreen::new(FileTree::new(cwd)?))
+    }
+}
+
+impl From<MainScreen> for Screen {
+    fn from(screen: MainScreen) -> Screen {
+        Screen::Main(screen)
+    }
 }
 
 impl elm::View for MainScreen {
@@ -42,6 +59,9 @@ impl elm::View for MainScreen {
         match msg {
             elm::Message::Error(e) => {
                 self.error = Some(e.to_string());
+            }
+            elm::Message::Key(k) if k.code == KeyCode::Char('2') => {
+                return Ok(elm::Command::ShowFocusScreen);
             }
             _ => {}
         }

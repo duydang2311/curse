@@ -2,14 +2,13 @@ use crate::{
     app::App,
     daemon::{Daemon, spawn_daemon_thread},
     elm::View,
-    ui::{file_tree::FileTree, main_screen::MainScreen},
+    ui::{focus_screen::FocusScreen, main_screen::MainScreen},
     utils::ResultExt,
 };
 use common::spawn::spawn_daemon_detached;
 use crossterm::event::{self, Event, KeyEventKind};
 use eyre::{Context, eyre};
 use std::{
-    env,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -28,12 +27,7 @@ mod utils;
 fn main() -> eyre::Result<()> {
     spawn_daemon_detached()?;
 
-    let cwd = match env::current_dir() {
-        Ok(path) => path,
-        Err(e) => env::home_dir().ok_or(e)?,
-    };
-    let mut app = App::new(MainScreen::new(FileTree::new(cwd)?).into());
-
+    let mut app = App::new(MainScreen::from_current_dir()?.into());
     let (tx, rx) = mpsc::channel();
     let input_exited = Arc::new(AtomicBool::new(false));
     let input_handler = spawn_input_thread(tx.clone(), input_exited.clone());
@@ -48,11 +42,15 @@ fn main() -> eyre::Result<()> {
                 let buffer = frame.buffer_mut();
                 app.view(area, buffer);
             })?;
-            match app.update(&rx.recv()?).ok_or_report(&tx) {
+            let msg = rx.recv()?;
+            if matches!(msg, elm::Message::Resize) {
+                continue;
+            }
+            match app.update(&msg).ok_or_report(&tx) {
                 Some(elm::Command::Exit) => {
                     break;
                 }
-                Some(cmd) => run_cmd(cmd, &daemon, &tx),
+                Some(cmd) => run_cmd(cmd, &mut app, &daemon, &tx),
                 None => {}
             }
         }
@@ -67,7 +65,7 @@ fn main() -> eyre::Result<()> {
     result
 }
 
-fn run_cmd(cmd: elm::Command, daemon: &Daemon, tx: &Sender<elm::Message>) {
+fn run_cmd(cmd: elm::Command, app: &mut App, daemon: &Daemon, tx: &Sender<elm::Message>) {
     let mut stack: Vec<elm::Command> = vec![cmd];
     while let Some(cmd) = stack.pop() {
         match cmd {
@@ -81,6 +79,15 @@ fn run_cmd(cmd: elm::Command, daemon: &Daemon, tx: &Sender<elm::Message>) {
             elm::Command::Play(path) => {
                 daemon.play(path).ok_or_report(tx);
             }
+            elm::Command::ShowMainScreen => {
+                match MainScreen::from_current_dir().ok_or_report(&tx) {
+                    Some(screen) => app.set_screen(screen.into()),
+                    None => {}
+                }
+            }
+            elm::Command::ShowFocusScreen => {
+                app.set_screen(FocusScreen.into());
+            }
         }
     }
 }
@@ -91,11 +98,15 @@ fn spawn_input_thread(
 ) -> JoinHandle<eyre::Result<()>> {
     thread::spawn(move || -> eyre::Result<()> {
         while !exited.load(Ordering::Relaxed) {
-            if event::poll(Duration::from_millis(200))?
-                && let Ok(Event::Key(k)) = event::read()
-                && k.kind == KeyEventKind::Press
-                && tx.send(elm::Message::Key(k)).is_err()
-            {
+            if !event::poll(Duration::from_millis(200))? {
+                continue;
+            }
+            let msg = match event::read()? {
+                Event::Key(k) if k.kind == KeyEventKind::Press => elm::Message::Key(k),
+                Event::Resize(_, _) => elm::Message::Resize,
+                _ => continue,
+            };
+            if tx.send(msg).is_err() {
                 break;
             }
         }

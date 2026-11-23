@@ -10,6 +10,10 @@ impl App {
     pub fn new(screen: Screen) -> App {
         App { screen }
     }
+
+    pub fn set_screen(&mut self, screen: Screen) {
+        self.screen = screen;
+    }
 }
 
 impl elm::View for App {

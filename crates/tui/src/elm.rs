@@ -6,6 +6,7 @@ use crate::elm;
 
 #[derive(Debug)]
 pub enum Message {
+    Resize,
     Key(KeyEvent),
     DaemonDisconnected,
     Handshake(Snapshot),
@@ -19,6 +20,8 @@ pub enum Command {
     Exit,
     Batch(Vec<Command>),
     Play(PathBuf),
+    ShowMainScreen,
+    ShowFocusScreen,
 }
 
 pub trait View {
