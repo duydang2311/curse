@@ -1,4 +1,3 @@
-use common::msg::ServerMsg;
 use daemon::{
     ma_decoder, ma_decoder_read_pcm_frames, ma_decoder_uninit, ma_device, ma_device_config_init,
     ma_device_init, ma_device_start, ma_device_type_ma_device_type_playback, ma_device_uninit,
@@ -14,7 +13,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::app::App;
+use crate::app::AppMsg;
 
 pub enum AudioMsg {
     Play(PathBuf),
@@ -35,24 +34,26 @@ impl Drop for Playback {
     }
 }
 
-pub fn spawn_audio_thread(app: App, rx: mpsc::Receiver<AudioMsg>) -> JoinHandle<()> {
+pub fn spawn_audio_thread(
+    rx: mpsc::Receiver<AudioMsg>,
+    app_tx: mpsc::Sender<AppMsg>,
+) -> JoinHandle<()> {
     thread::spawn(move || {
         let mut playback: Option<Playback> = None;
-        loop {
-            match rx.recv() {
-                Ok(AudioMsg::Play(path_buf)) => match play(&path_buf) {
+        for msg in rx {
+            match msg {
+                AudioMsg::Play(path_buf) => match play(&path_buf) {
                     Ok(pb) => {
                         playback = Some(pb);
-                        app.clients.broadcast(&ServerMsg::TrackStarted(path_buf));
+                        if app_tx.send(AppMsg::TrackStarted(path_buf)).is_err() {
+                            break;
+                        }
                     }
                     Err(e) => {
                         eprintln!("failed to play {}: {}", &path_buf.display(), e);
                     }
                 },
-                Ok(AudioMsg::Shutdown) => break,
-                Err(e) => {
-                    eprintln!("failed to receive audio msg: {}", e);
-                }
+                AudioMsg::Shutdown => break,
             }
         }
     })

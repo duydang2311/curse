@@ -1,60 +1,77 @@
-use crate::{
-    app::{App, AppMsg},
-    audio::AudioMsg,
-};
-use common::msg::{ClientMsg, ServerMsg, Snapshot, write_frame};
+use crate::app::AppMsg;
+use common::msg::{ClientMsg, ServerMsg, write_frame};
 use eyre::eyre;
 use interprocess::local_socket::{Listener, Stream, prelude::*};
 use std::{
+    collections::HashMap,
     io::{BufReader, Read},
-    sync::{Arc, Mutex},
+    sync::{Arc, mpsc::Sender},
     thread::{self, JoinHandle},
 };
 
-#[derive(Debug, Default, Clone)]
-pub struct Clients(Arc<Mutex<Vec<Arc<Stream>>>>);
+pub type ClientId = usize;
+
+#[derive(Debug, Default)]
+pub struct Clients {
+    streams: HashMap<ClientId, Arc<Stream>>,
+}
 
 impl Clients {
-    pub fn add(&self, stream: Arc<Stream>) {
-        self.0.lock().unwrap().push(stream);
-        println!("add count: {}", self.0.lock().unwrap().len());
+    pub fn add(&mut self, id: ClientId, stream: Arc<Stream>) {
+        self.streams.insert(id, stream);
     }
 
-    pub fn remove(&self, stream: &Arc<Stream>) {
-        self.0.lock().unwrap().retain(|s| !Arc::ptr_eq(s, stream));
-        println!("remove count: {}", self.0.lock().unwrap().len());
+    pub fn remove(&mut self, id: ClientId) -> Option<Arc<Stream>> {
+        self.streams.remove(&id)
     }
 
-    pub fn broadcast(&self, msg: &ServerMsg) {
-        self.0.lock().unwrap().retain(|s| {
-            let res = write_frame(&**s, msg);
-            eprintln!("write_frame: {:?}", res);
-            return res.is_ok();
-        });
+    pub fn send(&self, id: ClientId, msg: &ServerMsg) -> eyre::Result<()> {
+        let stream = self
+            .streams
+            .get(&id)
+            .ok_or_else(|| eyre!("unknown client {id}"))?;
+        write_frame(&**stream, msg)
+    }
+
+    pub fn broadcast(&mut self, msg: &ServerMsg) {
+        self.streams
+            .retain(|id, stream| match write_frame(&**stream, msg) {
+                Ok(()) => true,
+                Err(e) => {
+                    eprintln!("failed to write to client {id}: {e}");
+                    false
+                }
+            });
     }
 }
 
-pub fn spawn_client_thread(listener: Listener, app: App) -> JoinHandle<()> {
+pub fn spawn_client_thread(listener: Listener, tx: Sender<AppMsg>) -> JoinHandle<()> {
     thread::spawn(move || {
+        let mut next_id: ClientId = 0;
         for conn in listener.incoming().filter_map(|conn| {
-            conn.map_err(|e| eyre!("incoming connection failed: {e}"))
+            conn.map_err(|e| eprintln!("incoming connection failed: {e}"))
                 .ok()
         }) {
+            let id = next_id;
+            next_id += 1;
+
             let conn = Arc::new(conn);
-            app.clients.add(conn.clone());
+            if tx.send(AppMsg::ClientConnected(id, conn.clone())).is_err() {
+                break;
+            }
             thread::spawn({
-                let app = app.clone();
+                let tx = tx.clone();
                 move || {
-                    handle_client(conn.clone(), app.clone());
-                    app.clients.remove(&conn);
+                    handle_client(id, &conn, &tx);
+                    let _ = tx.send(AppMsg::ClientDisconnected(id));
                 }
             });
         }
     })
 }
 
-fn handle_client(stream: Arc<Stream>, app: App) {
-    let mut s = BufReader::new(&*stream);
+fn handle_client(id: ClientId, stream: &Stream, tx: &Sender<AppMsg>) {
+    let mut s = BufReader::new(stream);
     loop {
         let mut len_buf = [0u8; 4];
         if let Err(e) = s.read_exact(&mut len_buf) {
@@ -77,27 +94,8 @@ fn handle_client(stream: Arc<Stream>, app: App) {
             }
         };
 
-        match msg {
-            ClientMsg::Handshake => {
-                let _ = write_frame(
-                    &*stream,
-                    &&ServerMsg::Handshake(Snapshot {
-                        current_track: app.current_track(),
-                    }),
-                );
-            }
-            ClientMsg::Shutdown => {
-                if let Err(e) = app.tx.send(AppMsg::Shutdown) {
-                    eprintln!("failed to send shutdown signal: {}", e);
-                }
-                break;
-            }
-            ClientMsg::Play(path_buf) => {
-                app.set_current_track(path_buf.clone());
-                if let Err(e) = app.audio_tx.send(AudioMsg::Play(path_buf)) {
-                    eprintln!("failed to send play audio msg: {}", e);
-                }
-            }
-        };
+        if tx.send(AppMsg::ClientMsg(id, msg)).is_err() {
+            break;
+        }
     }
 }

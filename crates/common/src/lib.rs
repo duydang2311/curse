@@ -3,6 +3,7 @@ use interprocess::local_socket::{
 };
 
 pub mod msg;
+pub mod playback;
 pub mod spawn;
 
 const SOCKET_NAME: &str = "curse-daemon.sock";

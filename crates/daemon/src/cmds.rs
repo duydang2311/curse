@@ -1,9 +1,6 @@
 use crate::{
     app::{App, AppMsg},
-    audio::{
-        AudioMsg::{self},
-        spawn_audio_thread,
-    },
+    audio::{AudioMsg, spawn_audio_thread},
     client::spawn_client_thread,
 };
 use common::{get_socket_name, msg::ClientMsg, spawn::spawn_daemon_detached};
@@ -51,12 +48,16 @@ pub fn run() -> eyre::Result<()> {
     println!("daemon running at {SOCKET_NAME}");
     let (app_tx, app_rx) = mpsc::channel::<AppMsg>();
     let (audio_tx, audio_rx) = mpsc::channel::<AudioMsg>();
-    let app = App::new(app_tx, audio_tx.clone());
+    let mut app = App::new(audio_tx.clone());
 
-    spawn_client_thread(listener, app.clone());
-    let audio_handle = spawn_audio_thread(app.clone(), audio_rx);
+    spawn_client_thread(listener, app_tx.clone());
+    let audio_handle = spawn_audio_thread(audio_rx, app_tx);
 
-    app_rx.recv()?;
+    for msg in app_rx {
+        if app.handle(msg).is_break() {
+            break;
+        }
+    }
 
     let _ = audio_tx.send(AudioMsg::Shutdown);
     audio_handle

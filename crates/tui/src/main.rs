@@ -21,6 +21,7 @@ use std::{
 mod app;
 mod daemon;
 mod elm;
+mod playback;
 mod ui;
 mod utils;
 
