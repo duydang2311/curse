@@ -3,6 +3,7 @@ use std::{
     path::PathBuf,
 };
 
+use crate::playback::Track;
 use eyre::{Context, eyre};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
@@ -21,7 +22,7 @@ pub enum ServerMsg {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Snapshot {
-    pub current_track: Option<PathBuf>,
+    pub current_track: Option<Track>,
 }
 
 pub fn write_frame<M: Serialize>(mut w: impl Write, msg: &M) -> eyre::Result<()> {

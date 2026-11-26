@@ -1,18 +1,21 @@
-use std::{ops::ControlFlow, path::PathBuf, sync::Arc, sync::mpsc::Sender};
-
-use common::msg::{ClientMsg, ServerMsg, Snapshot};
+use common::{
+    msg::{ClientMsg, ServerMsg, Snapshot},
+    playback::Track,
+};
 use interprocess::local_socket::Stream;
+use std::{ops::ControlFlow, path::PathBuf, sync::Arc, sync::mpsc::Sender};
 
 use crate::{
     audio::AudioMsg,
     client::{ClientId, Clients},
+    playback::PlaybackState,
 };
 
 #[derive(Debug)]
 pub struct App {
     clients: Clients,
     audio_tx: Sender<AudioMsg>,
-    current_track: Option<PathBuf>,
+    playback_state: PlaybackState,
 }
 
 pub enum AppMsg {
@@ -27,7 +30,7 @@ impl App {
         App {
             clients: Clients::default(),
             audio_tx,
-            current_track: None,
+            playback_state: PlaybackState::default(),
         }
     }
 
@@ -49,7 +52,7 @@ impl App {
         match msg {
             ClientMsg::Handshake => {
                 let snapshot = Snapshot {
-                    current_track: self.current_track.clone(),
+                    current_track: self.playback_state.current_track().map(|t| t.clone()),
                 };
                 if let Err(e) = self.clients.send(id, &ServerMsg::Handshake(snapshot)) {
                     eprintln!("failed to send handshake to client {id}: {e}");
@@ -57,6 +60,7 @@ impl App {
             }
             ClientMsg::Shutdown => return ControlFlow::Break(()),
             ClientMsg::Play(path) => {
+                self.playback_state.set_current();
                 self.current_track = Some(path.clone());
                 if let Err(e) = self.audio_tx.send(AudioMsg::Play(path)) {
                     eprintln!("failed to send play audio msg: {e}");

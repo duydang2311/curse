@@ -27,6 +27,7 @@ impl elm::View for App {
                 return Ok(elm::Command::Exit);
             }
             elm::Message::Handshake(snapshot) => {
+                self.playback_state.set_current(snapshot.current_track);
                 todo!()
             }
             _ => {}

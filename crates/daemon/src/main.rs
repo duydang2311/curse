@@ -4,6 +4,7 @@ mod app;
 mod audio;
 mod client;
 mod cmds;
+mod playback;
 
 fn cli() -> Command {
     Command::new("curse-daemon")
