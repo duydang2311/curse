@@ -1,6 +1,5 @@
 use common::{
-    msg::{ClientMsg, ServerMsg, Snapshot},
-    playback::Track,
+    msg::{ClientMsg, ServerMsg, Snapshot}, playback::Track,
 };
 use interprocess::local_socket::Stream;
 use std::{ops::ControlFlow, path::PathBuf, sync::Arc, sync::mpsc::Sender};
@@ -59,9 +58,14 @@ impl App {
                 }
             }
             ClientMsg::Shutdown => return ControlFlow::Break(()),
-            ClientMsg::Play(path) => {
+            ClientMsg::AddTrack(path) => {
                 self.playback_state.set_current();
-                self.current_track = Some(path.clone());
+                // self.current_track = Some(path.clone());
+                self.playback_state.add_track(Track {
+                    path,
+                    title: "Title".into(),
+                    artist: None
+                });
                 if let Err(e) = self.audio_tx.send(AudioMsg::Play(path)) {
                     eprintln!("failed to send play audio msg: {e}");
                 }

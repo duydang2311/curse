@@ -1,4 +1,4 @@
-use common::msg::Snapshot;
+use common::{msg::Snapshot, playback::TrackId};
 use crossterm::event::KeyEvent;
 use std::path::PathBuf;
 
@@ -19,9 +19,10 @@ pub enum Command {
     None,
     Exit,
     Batch(Vec<Command>),
-    Play(PathBuf),
+    Play(TrackId),
     ShowMainScreen,
     ShowFocusScreen,
+    AddTrack(PathBuf)
 }
 
 pub trait View {

@@ -2,12 +2,12 @@ use crate::elm;
 use common::{
     get_socket_name,
     msg::{ClientMsg, ServerMsg, read_frame, write_frame},
+    playback::TrackId,
 };
 use eyre::eyre;
 use interprocess::local_socket::{Stream, prelude::*};
 use serde::Serialize;
 use std::{
-    io::Read,
     path::PathBuf,
     sync::{
         Arc, Mutex, PoisonError,
@@ -23,8 +23,12 @@ pub struct Daemon {
 }
 
 impl Daemon {
-    pub fn play(&self, path: PathBuf) -> eyre::Result<()> {
-        self.send(&ClientMsg::Play(path))
+    pub fn play(&self, track_id: TrackId) -> eyre::Result<()> {
+        self.send(&ClientMsg::Play(track_id))
+    }
+
+    pub fn add_track(&self, path: PathBuf) -> eyre::Result<()> {
+        self.send(&ClientMsg::AddTrack(path))
     }
 
     fn send<M: Serialize>(&self, msg: &M) -> eyre::Result<()> {

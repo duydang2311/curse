@@ -236,7 +236,7 @@ impl elm::View for FileTree {
                 if self.dir(id).is_some() {
                     self.set_cwd(path)?;
                 } else {
-                    return Ok(elm::Command::Play(path));
+                    return Ok(elm::Command::AddTrack(path));
                 }
             }
             KeyCode::Char(' ') => {

@@ -1,17 +1,17 @@
+use crate::playback::{Track, TrackId};
+use eyre::{Context};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{
     io::{Read, Write},
     path::PathBuf,
 };
 
-use crate::playback::Track;
-use eyre::{Context, eyre};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
-
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ClientMsg {
     Handshake,
     Shutdown,
-    Play(PathBuf),
+    Play(TrackId),
+    AddTrack(PathBuf)
 }
 
 #[derive(Debug, Serialize, Deserialize)]

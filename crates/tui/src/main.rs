@@ -5,7 +5,7 @@ use crate::{
     ui::{focus_screen::FocusScreen, main_screen::MainScreen},
     utils::ResultExt,
 };
-use common::spawn::spawn_daemon_detached;
+use common::{msg::ClientMsg, spawn::spawn_daemon_detached};
 use crossterm::event::{self, Event, KeyEventKind};
 use eyre::{Context, eyre};
 use std::{
@@ -77,8 +77,8 @@ fn run_cmd(cmd: elm::Command, app: &mut App, daemon: &Daemon, tx: &Sender<elm::M
             elm::Command::Batch(cmds) => {
                 stack.extend(cmds.into_iter().rev());
             }
-            elm::Command::Play(path) => {
-                daemon.play(path).ok_or_report(tx);
+            elm::Command::Play(track_id) => {
+                daemon.play(track_id).ok_or_report(tx);
             }
             elm::Command::ShowMainScreen => {
                 match MainScreen::from_current_dir().ok_or_report(&tx) {
@@ -88,6 +88,9 @@ fn run_cmd(cmd: elm::Command, app: &mut App, daemon: &Daemon, tx: &Sender<elm::M
             }
             elm::Command::ShowFocusScreen => {
                 app.set_screen(FocusScreen.into());
+            }
+            elm::Command::AddTrack(path) => {
+                daemon.add_track(path).ok_or_report(tx);
             }
         }
     }
